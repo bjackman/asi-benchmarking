@@ -1,0 +1,36 @@
+<domain type='kvm'>
+  <name>{{ vm_libvirt_name }}</name>
+  <memory unit='GiB'>32</memory>
+  <vcpu placement='static'>8</vcpu>
+  <os>
+    <type arch='x86_64'>hvm</type>
+  </os>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='{{ debian_qcow2_path_prefix }}.{{ vm_libvirt_name }}'/>  
+
+      <target dev='vda' bus='virtio'/>
+    </disk>
+
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw'/>
+      <source file='{{ seed_image_path_prefix }}.{{ vm_libvirt_name }}'/>  
+
+      <target dev='vdb' bus='virtio'/>
+    </disk>
+
+    <interface type='network'>
+      <source network='default'/>
+      <model type='virtio'/>
+    </interface>
+
+    <serial type='pty'>
+      <target port='0'/>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+  </devices>
+</domain>

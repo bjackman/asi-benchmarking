@@ -1,0 +1,7 @@
+guest-inventory.yaml
+host-inventory.yaml
+
+json-pts-results
+host_facts
+guest_artifacts
+host_artifacts

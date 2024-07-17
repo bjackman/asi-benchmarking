@@ -1,0 +1,10 @@
+#cloud-config
+hostname: {{ hostname }}
+users:
+  - name: god
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    ssh_authorized_keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPu6mHOCgndjWY/m1MwoEIEfvzhey8ZnEMBMUwwgliBm jackmanb_google_com@my-big-bm.us-east4-c.c.jackmanb-benchmarking.internal"
+# written to /var/log/cloud-init-output.log
+final_message: "The system is finally up, after $UPTIME seconds"

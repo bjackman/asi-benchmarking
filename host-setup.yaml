@@ -1,0 +1,267 @@
+# Tested on Ubuntu 24.04
+
+- name: Setup
+  hosts: host_hosts
+  vars:
+    # To try and keep things under control we'll pin to a specific Debian image.
+    # I guess this will eventually go out of date so at that point this will
+    # stop working and we'll just pin to a different one.
+    debian_version: 20230531-1397
+    debian_type: genericcloud
+    # Path of backing file. This will then be shared by an overlay file per VM.
+    # /tmp is a bad choice here, it's not persistent across reboots.
+    debian_qcow2_path_prefix: "/tmp/debian-12-{{debian_type}}-amd64-{{debian_version}}.qcow2"
+    # We'll create a VM for each of these, and these will be the names of the
+    # libvirt "domains" (i.e. VMs).
+    vm_libvirt_names: [ vm0 ]
+    seed_image_path_prefix: "/tmp/seed.img"
+
+  tasks:
+  # I assume it's possible to do this provisioning with AkppArmor on but I can't
+  # be bothered.
+  # I'm pretty sure there is a libvirt documentation page that talks about this
+  # in detail but I can't find it.
+  - name: Disable libvirt AppArmor profile
+    become: yes
+    # Ubuntu documentation also describes doing this by disabling the systemd
+    # service, that doesn't work in my experience.
+    command:
+      argv:
+      - "bash"
+      - "-c"
+      - |
+          aa-status | grep libvirtd || exit 0
+          set -e
+          apparmor_parser -R /etc/apparmor.d/usr.sbin.libvirtd  # disable now
+          mkdir -p /etc/apparmor.d/disable/
+          ln -s /etc/apparmor.d/usr.sbin.libvirtd /etc/apparmor.d/disable/  # disable for future boots
+          echo did_disable
+    register: apparmor_disable_result
+    changed_when: "'did_disable' in apparmor_disable_result.stdout"
+
+  - name: Install general dependency packages
+    become: yes
+    ansible.builtin.apt:
+      # Update if cache older than 24h (expressed in seconds)
+      cache_valid_time: 86400
+      pkg:
+      - qemu-kvm
+      - libvirt-daemon-system
+
+      # Needed for Ansible logic.
+      - python3-lxml
+      - python3-libvirt
+
+      - libguestfs-tools
+      - cloud-image-utils  # Not sure if this is needed any more.
+
+  - name: Join necessary Unix groups
+    become: yes
+    user:
+      name: "{{ ansible_user }}"
+      groups: kvm,libvirt
+    register: join_groups_result
+
+  - name: Upload kernel package
+    copy:
+      src: "{{ kernel_deb_local_path }}"
+      dest: "/tmp/{{ kernel_deb_local_path | basename }}"
+
+  - name: Install kernel
+    become: yes
+    apt:
+      deb: "/tmp/{{ kernel_deb_local_path | basename }}"
+    register: kernel_deb_install_result
+
+  # Installing the kernel should have created a grub menu entry. Now we just
+  # need to figure out the title of that entry and set GRUB_DEFAULT to that
+  # value. It loooks like
+  # gnulinux-6.10.0always-srso+-advanced-17d5cd79-9f0c-49dc-a4a9-65bd1ee5dd47
+  # So we need to figure out the UUID of our root partition and then combine
+  # that with the kernel release. I'm not sure where "advanced" comes from.
+  - name: Find rootfs UUID
+    become: yes
+    shell:
+      cmd: sudo blkid -s UUID -o value $(sudo findmnt -no SOURCE /)
+    register: rootfs_uuid_result
+    failed_when: rootfs_uuid_result.stdout == ""
+  - name: Select kernel in Grub
+    become: yes
+    lineinfile:
+      path: /etc/default/grub
+      regexp: '^GRUB_DEFAULT='
+      line: 'GRUB_DEFAULT="gnulinux-{{ kernel_release_string }}-advanced-{{ rootfs_uuid_result.stdout | trim }}"'
+    register: modify_grub_default_result
+
+  - name: Modify kernel cmdline
+    become: yes
+    lineinfile:
+      path: /etc/default/grub
+      regexp: '^GRUB_CMDLINE_LINUX='
+      line: 'GRUB_CMDLINE_LINUX="{{ kernel_cmdline }}"'
+    register: modify_grub_cmdline_result
+
+  - name: Update grub
+    become: yes
+    command: update-grub
+    when: modify_grub_cmdline_result.changed or modify_grub_default_result.changed
+    register: update_grub_result
+
+  # Can't figure out a better way to make joining the group take effect. Ubuntu
+  # is too clever for this to be done by just resetting SSH.
+  - name:  Reboot if necessary
+    become: yes
+    reboot:
+    when: join_groups_result.changed or kernel_deb_install_result.changed or update_grub_result.changed
+    register: reboot_result
+
+  - name: Refresh facts after reboot
+    setup: {}
+    when: reboot_result.changed
+
+  # TODO: Figure out how to check this is the exact kernel we expect. This at least
+  # checks we are running something with the same release string.
+  - name: Check running our kernel
+    shell: "uname -r"
+    register: uname_r_result
+    failed_when: "kernel_release_string not in uname_r_result.stdout"
+
+  - name: Download debian image
+    get_url:
+      url: "https://cloud.debian.org/images/cloud/bookworm/{{debian_version}}/debian-12-{{debian_type}}-amd64-{{debian_version}}.qcow2"
+      dest: "{{ debian_qcow2_path_prefix }}"
+
+  # cloud-init configuration will create the necessary user and set up SSH.
+  - name: Upload cloud_init configs
+    with_items: "{{ vm_libvirt_names }}"
+    template:
+      src: cloud_init.cfg.j2
+      dest: "/tmp/cloud_init.cfg.{{ item }}"
+    vars:
+      hostname: "{{ item }}"
+
+  # This is how you get a cloud-init configuration into a format the guest can read.
+  - name: Create seed images
+    with_items: "{{ vm_libvirt_names }}"
+    command:
+      cmd: "cloud-localds {{ seed_image_path_prefix }}.{{ item }} /tmp/cloud_init.cfg.{{ item }}"
+      # Don't set creates: since this is fast to regenerate anyway and creates:
+      # means we don't get updated if we change the source code.
+
+  # libvirt Ansible module is sux, fails when destroying a nonexisting VM,
+  # doesn't handle modifying existing VMs. Clean up with a shell command
+  # instead.
+  - name: Destroy leftover VMs
+    with_items: "{{ vm_libvirt_names }}"
+    shell:
+      cmd: "virsh list --all | awk 'NR>2 {print $2}' | xargs -I {} virsh undefine {}"
+
+  - name: Create per-VM disk images from shared backing file
+    with_items: "{{ vm_libvirt_names }}"
+    command:
+      cmd: "qemu-img create -F qcow2 -f qcow2 -b {{ debian_qcow2_path_prefix }} {{ debian_qcow2_path_prefix }}.{{item}}"
+      # Also don't set creates: here for the same reason as above.
+
+  - name: Resize rootfs images
+    with_items: "{{ vm_libvirt_names }}"
+    command:
+      cmd: "qemu-img resize {{ debian_qcow2_path_prefix }}.{{item}} 32G"
+
+  # The VM definition template includes stuff to inject the cloud-image configuration.
+  # Note that this ansible plugin doesn't seem to verify the configuration
+  # matches the input. So you need to destroy the machines manually if you
+  # change the configuration.
+  - name: Define VMs
+    with_items: "{{ vm_libvirt_names }}"
+    community.libvirt.virt:
+      command: define
+      xml: "{{ lookup('template', 'vm-template.xml.j2', template_vars={'vm_libvirt_name': '{{ item }}'}) }}"
+
+  - name: Start VMs
+    with_items: "{{ vm_libvirt_names }}"
+    community.libvirt.virt:
+      name: "{{ item }}"
+      state: running
+
+  - name: Wait for VMs to be up, get IPs (if this takes more than a couple of minutes, something's wrong)
+    with_items: "{{ vm_libvirt_names }}"
+    command:
+      argv:
+      - "bash"
+      - "-c"
+      - |
+          set -o pipefail
+          while true; do
+            if virsh -c qemu:///system domifaddr {{ item }} | grep --silent ipv4; then
+              # Write IP address to stdout
+              virsh -c qemu:///system domifaddr {{ item }}| awk '/ipv4/{print $4}' | cut -d '/' -f 1
+              exit 0
+            fi
+          done
+    register: vm_ip_results
+
+  # This is a nasty hack really, it should be possible instead to actually
+  # dynamically add the hosts to the live ansible inventory. I dunno if it's
+  # also possible to then export that inventory for manual reuse.
+  # The template is tightly coupled with the script above that registers
+  # vm_ip_results.
+  - name: Generate guest inventory
+    template:
+      src: guest_inventory.yaml.j2
+      dest: /tmp/guest-inventory.yaml
+
+  - name: Fetch guest inventory
+    fetch:
+      src: /tmp/guest-inventory.yaml
+      dest: guest-inventories
+
+  # This used to try and parse the vulnerabilities files in Ansible code, but it
+  # was buggy and annoying. So we just dump the whole directory.
+  # The community.general.archive module doesn't work here. The no-file-shrank
+  # thing is probably related. The P flag gets rid of an error abuot leading /,
+  # I think because tar doesn't like handling absolute paths???
+  - name: Archive sysfs CPU info
+    command:
+      argv:
+      - "bash"
+      - "-c"
+      - |
+        tar czfP /tmp/sysfs_cpu.tgz --warning=no-file-shrank /sys/devices/system/cpu/vulnerabilities
+        code=$?
+        if [ $code == 1 ]; then
+          # tar doesn't like sysfs. Error code 1 just means it is freaking out
+          # about that.
+          exit 0
+        fi
+        exit $code
+
+  - name: Create local directory for host artifacts
+    local_action:
+      module: file
+      path: host_artifacts
+      state: directory
+
+  - name: Fetch CPU sysfs info
+    fetch:
+      src: /tmp/sysfs_cpu.tgz
+      dest: host_artifacts
+
+  - name: Dump kernel config
+    shell:
+      cmd: "cp /boot/config-$(uname -r) /tmp/kconfig"
+
+  - name: Downlod kernel config
+    fetch:
+      src: /tmp/kconfig
+      dest: host_artifacts
+
+  - name: Gather and dump facts per host
+    setup:
+      gather_subset: all
+
+  - name: Dump facts to JSON files per host
+    local_action:
+      module: copy
+      content: "{{ hostvars[item] | to_nice_json }}"
+      dest: "host_artifacts/{{ item }}/ansible_facts.json"
+    loop: "{{ ansible_play_hosts }}"

@@ -1,0 +1,8 @@
+guests:
+  hosts:
+{% for result in vm_ip_results.results %}
+    {{ inventory_hostname }}_{{ result.item }}:
+      ansible_user: god
+      ansible_host: {{ result.stdout }}
+      ansible_ssh_common_args: '-i ssh_private_key -o ProxyCommand="ssh -o IdentitiesOnly=yes -W %h:%p {{ ansible_user }}@{{ ansible_host }}"'
+{% endfor %}
