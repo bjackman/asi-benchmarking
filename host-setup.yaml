@@ -82,7 +82,7 @@
   - name: Find rootfs UUID
     become: yes
     shell:
-      cmd: sudo blkid -s UUID -o value $(sudo findmnt -no SOURCE /)
+      cmd: blkid -s UUID -o value $(sudo findmnt -no SOURCE /)
     register: rootfs_uuid_result
     failed_when: rootfs_uuid_result.stdout == ""
   - name: Select kernel in Grub
