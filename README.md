@@ -1,0 +1,1 @@
+Copy the kernel bzImage to ./mkosi.extra//usr/lib/modules/$(make kernelrelease)/vmlinuz then `~/src/mkosi/bin/mkosi -f`
