@@ -16,24 +16,19 @@ DB_ROOT="$1"
 MITIGATIONS_OFF="mitigations=auto gather_data_sampling=off kvm.nx_huge_pages=off l1tf=off mds=off \
     mmio_stale_data=off nopti nospectre_v1 nospectre_v2 reg_file_data_sampling=off \
     spec_rstack_overflow=off spectre_bhi=off spectre_v2_user=off srbds=off \
-    tsx_async_abort=off"
+    tsx_async_abort=off force_cpu_bug=srso"
 
 # ansible-playbook -i host-inventory.yaml host-setup.yaml \
-#     -e "kernel_cmdline=\"$MITIGATIONS_OFF retbleed=ibpb\""
-# ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
-# ./upload_results.sh "$DB_ROOT"
-
-# ansible-playbook -i host-inventory.yaml host-setup.yaml \
-#     -e "kernel_cmdline=\"$MITIGATIONS_OFF retbleed=off asi=on\""
+#     -e "kernel_cmdline=\"$MITIGATIONS_OFF spec_rstack_overflow=ibpb-vmexit\""
 # ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
 # ./upload_results.sh "$DB_ROOT"
 
 ansible-playbook -i host-inventory.yaml host-setup.yaml \
-    -e "kernel_cmdline=\"$MITIGATIONS_OFF retbleed=off\""
+    -e "kernel_cmdline=\"$MITIGATIONS_OFF retbleed=off asi=on\""
 ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
 ./upload_results.sh "$DB_ROOT"
 
-# ansible-playbook -i host-inventory.yaml host-setup.yaml \
-#     -e "kernel_cmdline=\"$MITIGATIONS_OFF retbleed=unret\""
-# ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
-# ./upload_results.sh "$DB_ROOT"
+ansible-playbook -i host-inventory.yaml host-setup.yaml \
+    -e "kernel_cmdline=\"$MITIGATIONS_OFF\""
+ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
+./upload_results.sh "$DB_ROOT"

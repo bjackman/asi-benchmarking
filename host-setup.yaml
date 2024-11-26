@@ -30,6 +30,7 @@
       - "bash"
       - "-c"
       - |
+          [ -e /usr/sbin/aa-status ] || exit 0  # No AppArmr here.
           aa-status | grep libvirtd || exit 0
           set -e
           apparmor_parser -R /etc/apparmor.d/usr.sbin.libvirtd  # disable now
@@ -40,20 +41,19 @@
     changed_when: "'did_disable' in apparmor_disable_result.stdout"
 
   - name: Install general dependency packages
+    # when: not (skip_package_install | default(false))
     become: yes
     ansible.builtin.apt:
       # Update if cache older than 24h (expressed in seconds)
-      cache_valid_time: 86400
+      # cache_valid_time: 86400
       pkg:
       - qemu-kvm
       - libvirt-daemon-system
+      - cloud-image-utils
 
       # Needed for Ansible logic.
       - python3-lxml
       - python3-libvirt
-
-      - libguestfs-tools
-      - cloud-image-utils  # Not sure if this is needed any more.
 
   - name: Join necessary Unix groups
     become: yes
@@ -61,58 +61,19 @@
       name: "{{ ansible_user }}"
       groups: kvm,libvirt
     register: join_groups_result
-
-  - name: Upload kernel package
-    copy:
-      src: "{{ kernel_deb_local_path }}"
-      dest: "/tmp/{{ kernel_deb_local_path | basename }}"
+    when: "ansible_user != 'root'"
 
   - name: Install kernel
-    become: yes
-    apt:
-      deb: "/tmp/{{ kernel_deb_local_path | basename }}"
-    register: kernel_deb_install_result
-
-  # Installing the kernel should have created a grub menu entry. Now we just
-  # need to figure out the title of that entry and set GRUB_DEFAULT to that
-  # value. It loooks like
-  # gnulinux-6.10.0always-srso+-advanced-17d5cd79-9f0c-49dc-a4a9-65bd1ee5dd47
-  # So we need to figure out the UUID of our root partition and then combine
-  # that with the kernel release. I'm not sure where "advanced" comes from.
-  - name: Find rootfs UUID
-    become: yes
-    shell:
-      cmd: blkid -s UUID -o value $(sudo findmnt -no SOURCE /)
-    register: rootfs_uuid_result
-    failed_when: rootfs_uuid_result.stdout == ""
-  - name: Select kernel in Grub
-    become: yes
-    lineinfile:
-      path: /etc/default/grub
-      regexp: '^GRUB_DEFAULT='
-      line: 'GRUB_DEFAULT="gnulinux-{{ kernel_release_string }}-advanced-{{ rootfs_uuid_result.stdout | trim }}"'
-    register: modify_grub_default_result
-
-  - name: Modify kernel cmdline
-    become: yes
-    lineinfile:
-      path: /etc/default/grub
-      regexp: '^GRUB_CMDLINE_LINUX='
-      line: 'GRUB_CMDLINE_LINUX="{{ kernel_cmdline }}"'
-    register: modify_grub_cmdline_result
-
-  - name: Update grub
-    become: yes
-    command: update-grub
-    when: modify_grub_cmdline_result.changed or modify_grub_default_result.changed
-    register: update_grub_result
+    include_role:
+      name: host_kernel
+    when: (kernel_deb_local_path | default('')) != ""
 
   # Can't figure out a better way to make joining the group take effect. Ubuntu
   # is too clever for this to be done by just resetting SSH.
   - name:  Reboot if necessary
     become: yes
     reboot:
-    when: join_groups_result.changed or kernel_deb_install_result.changed or update_grub_result.changed
+    when: join_groups_result.changed or ansible_facts.get("reboot_required_for_kernel")
     register: reboot_result
 
   - name: Refresh facts after reboot
@@ -122,12 +83,14 @@
   # TODO: Figure out how to check this is the exact kernel we expect. This at least
   # checks we are running something with the same release string.
   - name: Check running our kernel
+    when: "(kernel_release_string|default(''))"
     shell: "uname -r"
     register: uname_r_result
     failed_when: "kernel_release_string not in uname_r_result.stdout"
 
   - name: Download debian image
     get_url:
+      validate_certs: false
       url: "https://cloud.debian.org/images/cloud/bookworm/{{debian_version}}/debian-12-{{debian_type}}-amd64-{{debian_version}}.qcow2"
       dest: "{{ debian_qcow2_path_prefix }}"
 
@@ -247,8 +210,16 @@
       dest: host_artifacts
 
   - name: Dump kernel config
-    shell:
-      cmd: "cp /boot/config-$(uname -r) /tmp/kconfig"
+    command:
+      argv:
+      - "bash"
+      - "-c"
+      - |
+        if [ -e /proc/config.gz ]; then
+          gzip < /proc/config.gz > /tmp/kconfig
+        else
+          /boot/config-$(uname -r) /tmp/kconfig
+        fi
 
   - name: Downlod kernel config
     fetch:
