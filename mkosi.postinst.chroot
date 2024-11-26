@@ -1,0 +1,1 @@
+useradd --create-home --user-group brendan --password "$(echo password | openssl passwd -stdin -6)"
