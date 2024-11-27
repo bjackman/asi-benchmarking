@@ -5,3 +5,4 @@ json-pts-results
 host_facts
 guest_artifacts
 host_artifacts
+env.sh
