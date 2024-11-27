@@ -9,26 +9,45 @@ set -o pipefail
 
 DB_ROOT="$1"
 
-# Disable all mitigations except retbleed. Can't use mitigations=off because
-# then it's impossible to enable retbleed mitigations. Include mitigations=auto
-# in case there's a mitigations=off prepended by something (like
-# CONFIG_CMDLINE).
-MITIGATIONS_OFF="mitigations=auto gather_data_sampling=off kvm.nx_huge_pages=off l1tf=off mds=off \
-    mmio_stale_data=off nopti nospectre_v1 nospectre_v2 reg_file_data_sampling=off \
-    spec_rstack_overflow=off spectre_bhi=off spectre_v2_user=off srbds=off \
-    tsx_async_abort=off force_cpu_bug=srso"
+# First arg is verb, second arg is query.
+curl_pikvm() {
+    curl -X "$1"  -k -H X-KVMD-User:${PIKVM_USER:-admin} -H X-KVMD-Passwd:$PIKVM_PASSWORD \
+        "https://${PIKVM_HOST}:${PIKVM_HTTPS_PORT:-443}/$2" 2>/dev/null
+}
 
-# ansible-playbook -i host-inventory.yaml host-setup.yaml \
-#     -e "kernel_cmdline=\"$MITIGATIONS_OFF spec_rstack_overflow=ibpb-vmexit\""
-# ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
-# ./upload_results.sh "$DB_ROOT"
+ssh_pikvm() {
+    ssh -p "$PIKVM_SSH_PORT" "$PIKVM_SSH_USER@$PIKVM_HOST" "$@"
+}
 
-ansible-playbook -i host-inventory.yaml host-setup.yaml \
-    -e "kernel_cmdline=\"$MITIGATIONS_OFF retbleed=off asi=on\""
-ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
-./upload_results.sh "$DB_ROOT"
+# Shut down host so it doesn't leak proxy connections, unless it seems to be off already.
+if [[ $(curl_pikvm GET /api/atx | jq ".result.leds.power") != "false" ]]; then
+    ansible-playbook -i host-inventory.yaml host-shutdown.yaml
+fi
 
-ansible-playbook -i host-inventory.yaml host-setup.yaml \
-    -e "kernel_cmdline=\"$MITIGATIONS_OFF\""
-ansible-playbook $(printf -- ' -i %s'  guest-inventories/**/tmp/*.yaml) guest-setup.yaml
+# Disconnect mass storage, so we can write it.
+curl_pikvm POST "/api/msd/set_connected?connected=0"
+
+# Upload image. We need to do this using rsync because the HTTP upload can't
+# handle sparse images properly.
+# https://docs.pikvm.org/msd/#manual-drives-management
+ssh_pikvm kvmd-helper-otgmsd-remount rw
+# Dont use -a since we care about the permissions on the remote. But set --times
+# so rsync can detect when no new copying is needed.
+rsync -vz --sparse --progress --times -e "ssh -p $PIKVM_SSH_PORT" \
+    mkosi/image.raw "$PIKVM_SSH_USER@$PIKVM_HOST:/var/lib/kvmd/msd/image.raw"
+# Not documented but PiKVM falls over without at least these perms:
+ssh_pikvm chown kvmd:kvmd /var/lib/kvmd/msd/image.raw
+ssh_pikvm chmod 0644 /var/lib/kvmd/msd/image.raw
+ssh_pikvm kvmd-helper-otgmsd-remount ro
+
+# Reconnect MSD using image we just uploaded.
+curl_pikvm POST "/api/msd/set_params?image=image.raw&cdrom=0&rw=1"
+curl_pikvm POST "/api/msd/set_connected?connected=1"
+
+# Boot 'er up
+curl_pikvm POST "/api/atx/power?action=on"
+
+# Run the benchmark
+ansible-playbook -i host-inventory.yaml host-setup.yaml
+ansible-playbook -i guest-inventories/ibpb/tmp/guest-inventory.yaml guest-setup.yaml
 ./upload_results.sh "$DB_ROOT"

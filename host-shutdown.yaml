@@ -1,0 +1,6 @@
+- name: Shutdown hosts
+  hosts: host_hosts
+  roles:
+  - destroy_guests
+  tasks:
+  - community.general.shutdown: {}
