@@ -1,6 +1,6 @@
 [Unit]
 Description=SSH Tunnel to GCE
-After=network-online.target
+Wants=network-online.target
 
 [Service]
 ExecStart=/usr/bin/ssh -o StrictHostKeyChecking=no -R 0.0.0.0:2222:localhost:22 brendan@64:ff9b::34.90.180.154 -N
