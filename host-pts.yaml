@@ -1,0 +1,8 @@
+# Tested on Ubuntu 24.04
+
+- name: Setup
+  hosts: host_hosts
+  vars:
+    out_artifacts_dir: host_artifacts
+  roles:
+  - run_pts

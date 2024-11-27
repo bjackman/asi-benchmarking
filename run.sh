@@ -76,5 +76,8 @@ done
 
 # Run the benchmark
 ansible-playbook -i host-inventory.yaml host-setup.yaml
-ansible-playbook -i guest-inventories/ibpb/tmp/guest-inventory.yaml guest-setup.yaml
+# ... On bare metal
+ansible-playbook -i host-inventory.yaml host-pts.yaml
+# ... In the guest
+ansible-playbook -i guest-inventories/aethelred/tmp/guest-inventory.yaml guest-pts.yaml
 ./upload_results.sh "$DB_ROOT"
