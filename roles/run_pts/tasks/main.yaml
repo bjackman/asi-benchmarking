@@ -1,0 +1,61 @@
+- name: Install packages
+  become: yes
+  ansible.builtin.apt:
+    update_cache: true
+    pkg:
+    - git
+    - rsync # Hack - not related to anything else in here lol, just useful.
+    # phoronix-test-suite dependencies:
+    - php-cli
+    - php-xml
+
+- name: Clone phoronix-test-suite
+  git:
+    repo:  https://github.com/phoronix-test-suite/phoronix-test-suite.git
+    version: 99c30505d730c2429ad2120346dc197cf3f1355c  # Fix to something, don't care what.
+    dest: phoronix-test-suite
+
+- name: Create phoronix-test-suite config dir
+  file:
+    path: .phoronix-test-suite
+    state: directory
+
+- name: Configure phoronix-test-suite
+  copy:
+    src: ./pts-config/
+    dest: .phoronix-test-suite
+
+# Hack: this does some sort of global setup that is required for the non-root
+# mode installation to work without a password.
+- name: Setup phoronix-test-suite dependencies (root mode)
+  become: true
+  command:
+    cmd: ./phoronix-test-suite batch-install fio
+    chdir: phoronix-test-suite
+
+- name: Setup phoronix-test-suite dependencies (non-root)
+  command:
+    cmd: ./phoronix-test-suite batch-install fio
+    chdir: phoronix-test-suite
+
+- name: Run the fio suite
+  shell:
+    cmd: TEST_RESULTS_NAME=pts-results ./phoronix-test-suite/phoronix-test-suite batch-run fio-suite
+    creates: .phoronix-test-suite/test-results/pts-results
+
+# TODO: Doesn't work, something wrong with rsync.
+# - name: Fetch raw result
+#   ansible.posix.synchronize:
+#     mode: pull
+#     src: .phoronix-test-suite/test-results/pts-results
+#     dest: /tmp/raw-pts-results
+#     recursive: true
+
+- name: Export results as JSON
+  shell:
+    cmd: ./phoronix-test-suite/phoronix-test-suite result-file-to-json pts-results
+
+- name: Fetch JSON result
+  fetch:
+    src: pts-results.json
+    dest: "{{ out_artifacts_dir }}"
