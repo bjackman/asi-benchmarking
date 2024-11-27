@@ -33,8 +33,7 @@ if [[ $(curl_pikvm GET /api/atx | jq ".result.leds.power") != "false" ]]; then
     # failed), but that's fine since we're about to totally replace the disk
     # anyway.  The main reason we shut it down was to kill the SSH tunneling
     # service which is probably done by now.
-    # For some reason I found /api/atx/power?action=off doesn't do anything at least for my HW.
-    curl_pikvm POST "/api/atx/click?button=power&wait=1"
+    curl_pikvm POST "/api/atx/power?action=off_hard"
 fi
 
 # Disconnect mass storage, so we can write it.
