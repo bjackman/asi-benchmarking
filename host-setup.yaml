@@ -111,13 +111,9 @@
       # Don't set creates: since this is fast to regenerate anyway and creates:
       # means we don't get updated if we change the source code.
 
-  # libvirt Ansible module is sux, fails when destroying a nonexisting VM,
-  # doesn't handle modifying existing VMs. Clean up with a shell command
-  # instead.
   - name: Destroy leftover VMs
-    with_items: "{{ vm_libvirt_names }}"
-    shell:
-      cmd: "virsh list --all | awk 'NR>2 {print $2}' | xargs -I {} virsh undefine {}"
+    include_role:
+      name: destroy_guests
 
   - name: Create per-VM disk images from shared backing file
     with_items: "{{ vm_libvirt_names }}"

@@ -1,0 +1,3 @@
+# We'll create a VM for each of these, and these will be the names of the
+# libvirt "domains" (i.e. VMs).
+vm_libvirt_names: [ vm0 ]

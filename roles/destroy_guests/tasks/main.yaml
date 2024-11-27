@@ -1,0 +1,8 @@
+
+  # libvirt Ansible module is sux, fails when destroying a nonexisting VM,
+  # doesn't handle modifying existing VMs. Clean up with a shell command
+  # instead.
+  - name: Destroy leftover VMs
+    with_items: "{{ vm_libvirt_names }}"
+    shell:
+      cmd: "virsh list --all | awk 'NR>2 {print $2}' | xargs -I {} virsh undefine {}"
