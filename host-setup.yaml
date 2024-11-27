@@ -126,6 +126,37 @@
     command:
       cmd: "qemu-img resize {{ debian_qcow2_path_prefix }}.{{item}} 32G"
 
+  # Hack to make the guest VM have access to the internet on an IPv6-only network.
+  # I dunno if this breaks IPv4 or anything else.
+  - name: Configure libvirt IPv6 networking
+    command:
+      argv:
+      - "bash"
+      - "-c"
+      - |
+        virsh net-destroy default
+        virsh net-define /dev/stdin <<EOF
+        <network connections='1'>
+          <name>default</name>
+          <uuid>203c2c66-5e3c-4a65-8dae-e58a7fa70758</uuid>
+          <forward mode='nat'>
+            <nat ipv6='yes'>
+              <port start='1024' end='65535'/>
+            </nat>
+          </forward>
+          <bridge name='virbr0' stp='on' delay='0'/>
+          <mac address='52:54:00:57:28:95'/>
+          <ip address='192.168.122.1' netmask='255.255.255.0'>
+            <dhcp>
+              <range start='192.168.122.2' end='192.168.122.254'/>
+            </dhcp>
+          </ip>
+          <ip family='ipv6' address='fd53:6445:ba36::' prefix='64'>
+          </ip>
+        </network>
+        EOF
+        virsh net-start default
+
   # The VM definition template includes stuff to inject the cloud-image configuration.
   # Note that this ansible plugin doesn't seem to verify the configuration
   # matches the input. So you need to destroy the machines manually if you
