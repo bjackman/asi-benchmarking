@@ -111,6 +111,13 @@
       # Don't set creates: since this is fast to regenerate anyway and creates:
       # means we don't get updated if we change the source code.
 
+  # Weird packaging bug? When I boot my system libvirtd doesn't seem to read
+  # /etc/libvirt/libvirtd.conf until I restart it. So... do that.
+  - name: Restart libvirtd service
+    service:
+      name: libvirtd
+      state: restarted
+
   - name: Destroy leftover VMs
     include_role:
       name: destroy_guests
