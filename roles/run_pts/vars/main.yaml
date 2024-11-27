@@ -1,0 +1,2 @@
+pts_var_dir: "{{ '/var/lib/phoronix-test-suite' if ansible_user == 'root' else './phoronix-test-suite' }}"
+pts_config_file: "{{ '/etc/phoronix-test-suite.xml' if ansible_user == 'root' else './phoronix-test-suite/user-config.xml' }}"

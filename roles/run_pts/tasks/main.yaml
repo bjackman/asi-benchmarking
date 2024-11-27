@@ -15,15 +15,22 @@
     version: 99c30505d730c2429ad2120346dc197cf3f1355c  # Fix to something, don't care what.
     dest: phoronix-test-suite
 
-- name: Create phoronix-test-suite config dir
+- name: Create phoronix-test-suite data dir
   file:
-    path: .phoronix-test-suite
+    path: "{{ pts_var_dir }}"
     state: directory
 
-- name: Configure phoronix-test-suite
+# This is instead of running `phoronix-test-suite batch-setup`
+- name: Configure PTS for batch mode
   copy:
-    src: ./pts-config/
-    dest: .phoronix-test-suite
+    src: ./pts-config/user-config.xml
+    dest: "{{ pts_config_file }}"
+
+# This is instead of running `phoronix-test-suite add-suite`
+- name: Configure PTS suites
+  copy:
+    src: ./pts-config/test-suites
+    dest: "{{ pts_var_dir }}/test-suites"
 
 # Hack: this does some sort of global setup that is required for the non-root
 # mode installation to work without a password.
@@ -41,13 +48,16 @@
 - name: Run the fio suite
   shell:
     cmd: TEST_RESULTS_NAME=pts-results ./phoronix-test-suite/phoronix-test-suite batch-run fio-suite
-    creates: .phoronix-test-suite/test-results/pts-results
+    creates: "{{ pts_var_dir }}/test-results/pts-results"
+  register: fio_result
+- debug: var=fio_result.stdout_lines
+- debug: var=fio_result.stderr_lines
 
 # TODO: Doesn't work, something wrong with rsync.
 # - name: Fetch raw result
 #   ansible.posix.synchronize:
 #     mode: pull
-#     src: .phoronix-test-suite/test-results/pts-results
+#     src: "{{ pts_var_dir/test-results/pts-results }}"
 #     dest: /tmp/raw-pts-results
 #     recursive: true
 
