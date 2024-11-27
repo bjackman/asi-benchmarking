@@ -134,7 +134,8 @@
       - "bash"
       - "-c"
       - |
-        virsh net-destroy default
+        set -e
+        virsh net-undefine default
         virsh net-define /dev/stdin <<EOF
         <network connections='1'>
           <name>default</name>
