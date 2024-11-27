@@ -58,9 +58,6 @@ curl_pikvm POST "/api/msd/set_connected?connected=1"
 
 # Boot 'er up
 curl_pikvm POST "/api/atx/power?action=on"
-
-# Boot 'er up
-curl_pikvm POST "/api/atx/power?action=on"
 # Wait until the SSH port becomes visible.
 # -z = scan only,  -w5 = 5s timeout
 deadline_s=$(($(date +%s) + 120))
