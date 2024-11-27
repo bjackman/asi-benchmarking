@@ -3,4 +3,9 @@
   roles:
   - destroy_guests
   tasks:
+  # Try to make sure we don't leave dangling connections behind
+  - name: Stop ssh-tunnel service
+    service:
+      name: ssh-tunnel
+      state: stopped
   - community.general.shutdown: {}
