@@ -23,6 +23,11 @@ ssh_pikvm() {
 if [[ $(curl_pikvm GET /api/atx | jq ".result.leds.power") != "false" ]]; then
     ansible-playbook -i host-inventory.yaml host-shutdown.yaml
 fi
+# Kill the power. It's pretty likely it's still shutting down (or shutdown
+# failed), but that's fine since we're about to totally replace the disk anyway.
+# The main reason we shut it down was to kill the SSH tunneling service which is
+# probably done by now.
+curl_pikvm POST "/api/atx/power?action=on"
 
 # Disconnect mass storage, so we can write it.
 curl_pikvm POST "/api/msd/set_connected?connected=0"
