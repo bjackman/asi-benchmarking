@@ -1,42 +1,45 @@
 # Scripts for running phoronix-test-suite in a VM
 
 This is the hot pile of stinking garbage I've used to benchmark upstream ASI. It
-runs the FIO benchmark from Phoronix Test Suite on a QEMU guest on an Ubuntu
-24.04 host. It takes care of installing the kernel and gathering results.
+runs the FIO benchmark from Phoronix Test Suite on a QEMU guest on a Debian host
+build by [`mkosi`](https://github.com/systemd/mkosi), using a
+[PiKVM](https://docs.pikvm.org/) attached to a random desktop sitting in my
+office. I believe with minimal tweaking it should work in basically any context
+with x86 UEFI. It currently requires the test machine to have access to the
+internet; with more work (but not _that_ much more) it should be possible to
+make it work without internet access (as long as you can SSH to the box).
 
-It was mostly tested without a root login on the target host but towards the end
-I switched to a machine where I have direct root SSH access. If you're running
-without root login, and you hit some permissions errors, try adding `become:
-true` to the relevant stanza in host-setup.yaml.
+## Usage:
 
-To use it, something like:
+- Set these environment variables:
 
-- Get a machine running Ubuntu 24.04 that you can SSH into.
-
-  At one point I did this using GCE bare metal, and in that case I created it
-  something like this:
-
-  ```sh
-  gcloud compute instances create $HOST_INSTANCE --zone=us-east4-c --machine-type=c3-standard-192-metal  --maintenance-policy=TERMINATE --create-disk=boot=true,image-family=ubuntu-2404-lts-amd64,image-project=ubuntu-os-cloud,size=128 --metadata=enable-oslogin=true
+  ```
+  export PIKVM_PASSWORD=<Web UI password for your Pi-KVM>
+  export PIKVM_HOST=<domain name/IP of your Pi-KVM>
+  export PIKVM_HTTPS_PORT=8080
+  export PIKVM_SSH_USER=<user you can SSH to the Pi as>
+  export PIKVM_SSH_PORT=2223
+  export HOST=<domain name/IP of the host you're gonna run teh tests on>
+  export HOST_SSH_PORT=2222
   ```
 
-  After a while I started using a different system which made more interesting
-  CPUs available.
+- Figure out what drivers are needed to boot on your host. The easiest way to do
+  this is to boot up a normal system on it, run `lsmod`, then copy that to your
+  kernel tree and use `make localyesconfig` to enable all the drivers that were
+  loaded.
 
-- Build your kernel as a .deb pacakge. Try something like this:
+  You [probably also
+  want](https://unix.stackexchange.com/questions/537912/nftables-rule-no-such-file-or-directory-error)
+  `CONFIG_NFT_COUNTER`, `CONFIG_NFT_OBJREF` and `CONFIG_NF_TABLES_INET` for
+  libvirt networking to work.
 
-  ```sh
-  ssh $user@$host 'cat /boot/config-$(uname -r)' > .config && \
-    scripts/config -d CONFIG_SYSTEM_TRUSTED_KEYS -d CONFIG_SYSTEM_REVOCATION_KEYS &&
-    ssh $user@host lsmod > lsmod.txt && make localyesconfig LSMOD=lsmod.txt \
-    make olddefconfig && make -j100 bindeb-pkg -s
-  ```
+  Other generally useful cmdlines for benchmarking:
+    - `CONFIG_LOCALVERSION_AUTO` so you know exactly what kernel code you're testing
+    - `CONFIG_IKCONFIG`  and `CONFIG_IKCONFIG_PROC` so you know the kernel config.
 
-  You also probably want to modify `CONFIG_CMDLINE[_BOOL]` and
-  `CONFIG_LOCALVERSION` for some of these.
-
-- Wait for it to boot and be SSHable
-
+- Build your kernel as a `bzImage`, copy it to
+  `./mkosi/mkosi.extra/usr/lib/modules/$(make kernelrelease)/vmlinuz` in this
+  repo.
 - Write an inventory describing the host. The group with the host instances should be called
   `host_hosts` and each host should have a variable called
   `kernel_deb_local_path` containing the kernel image and one called
@@ -52,13 +55,41 @@ To use it, something like:
         ansible_host: 65.21.121.123
     vars:
       ansible_user: root
-      kernel_deb_local_path: ~/src/linux/linux-image-6.10.0asi-00032-gb28ddf044ce9_6.10.0-00032-gb28ddf044ce9-2_amd64.deb
-      kernel_release_string: 6.10.0asi-00032-gb28ddf044ce9
       # You might also want to configure SSH like this if you work in an
       # environment where SSH is complicated (like Google):
       ansible_ssh_private_key_file: ~/.ssh/id_rsa
       ansible_ssh_extra_args: '-o IdentitiesOnly=yes'
+      ansible_ssh_port: 2222
   ```
 
 - Run `run.sh $DB_PATH`. This is currently hardcoded for my specific ASI Rome
-  benchmarking needs.
+  benchmarking needs. Extra args are passed through to `mkosi` so you might want `--kernel-command-line-extra=something`.
+
+## Historical notes for my future self
+
+In prior iterations it was also tested on an Ubuntu 24.04 image, using a) GCE
+bare metal and b) a Hetzner dedicated server. GCE worked pretty well except that
+the firmware boots really slowly. I abandoned this because I didn't want to get
+locked into a platform where I was likely to suddently find I needed to test on
+a CPU that wasn't supported.
+
+This was how I created the GCE bare metal instances:
+
+```sh
+gcloud compute instances create $HOST_INSTANCE --zone=us-east4-c --machine-type=c3-standard-192-metal  --maintenance-policy=TERMINATE --create-disk=boot=true,image-family=ubuntu-2404-lts-amd64,image-project=ubuntu-os-cloud,size=128 --metadata=enable-oslogin=true
+```
+
+Next I used Hetzner Dedicated for a while which is a slightly less "modern"
+experience (unlike GCE bare metal which is more or less just GCE, except the
+instance is a physical host). IIRC the main downside of Hetzner was that most of
+their machines don't give you a serial port. IIRC it's possible to get a video
+stream if the machine suports it, but it's not immediate (I think a DC tech
+needs to go and plug it in at your request). The process of recovering from a
+borked machine is also slightly arduous. On balance, it's probably about equal
+to the Pi-KVM in terms of schleppiness and sketchiness. The only reason I
+abandoned Hetzner in the end was Google bureaucracy getting in the way.
+
+Earlier versions of this tooling were using stock Ubuntu images, building the
+kernel as a .deb, and installing and rebooting into it using Ansible. This was
+super annoying, I never really got the Grub config right so it would often
+reboot into the wrong kernel. It's also pretty annoying to build .debs.
