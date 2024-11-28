@@ -9,4 +9,4 @@ network:
     eno2:
       dhcp4: true
       dhcp6: true
-      optional: true
+      optional: false
