@@ -29,7 +29,7 @@
 # This is instead of running `phoronix-test-suite add-suite`
 - name: Configure PTS suites
   copy:
-    src: ./pts-config/test-suites
+    src: ./pts-config/test-suites/
     dest: "{{ pts_var_dir }}/test-suites"
 
 # Hack: this does some sort of global setup that is required for the non-root
