@@ -8,6 +8,8 @@ set -eux
 set -o pipefail
 
 DB_ROOT="$1"
+# Remaining args will be passed through to mkosi
+shift 1
 
 # First arg is verb, second arg is query.
 curl_pikvm() {
@@ -22,6 +24,10 @@ ssh_pikvm() {
 host_ssh_visible() {
     nc -zw5 "$HOST" $HOST_SSH_PORT
 }
+
+if [[ "${SKIP_MKOSI:-}" != "1" ]]; then
+    mkosi -f -C ./mkosi "$@"
+fi
 
 # Shut down host so it doesn't leak proxy connections, unless it seems to be off already.
 if [[ $(curl_pikvm GET /api/atx | jq ".result.leds.power") != "false" ]]; then
