@@ -142,8 +142,8 @@
       - "-c"
       - |
         set -e
-        virsh net-list --all | grep default && virsh net-destroy default
         virsh net-list --all | grep default && virsh net-undefine default
+        virsh net-list --all | grep default && virsh net-destroy default
         virsh net-define /dev/stdin <<EOF
         <network connections='1'>
           <name>default</name>
