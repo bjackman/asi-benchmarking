@@ -252,7 +252,7 @@
       - "-c"
       - |
         if [ -e /proc/config.gz ]; then
-          gzip < /proc/config.gz > /tmp/kconfig
+          gunzip < /proc/config.gz > /tmp/kconfig
         else
           /boot/config-$(uname -r) /tmp/kconfig
         fi
