@@ -63,7 +63,22 @@ make it work without internet access (as long as you can SSH to the box).
   ```
 
 - Run `run.sh $DB_PATH`. This is currently hardcoded for my specific ASI Rome
-  benchmarking needs. Extra args are passed through to `mkosi` so you might want `--kernel-command-line-extra=something`.
+  benchmarking needs. Extra args are passed through to `mkosi` so you might want
+  `--kernel-command-line-extra=something`.
+
+  Watch out because this overrides the whole cmdline, which means you can lose
+  stuff that is needed for the QEMU boot to work. Workarounds for that are:
+
+  - Use `--kernel-command-line-extra`.. but that won't have any effect on HW. Or:
+  - Boot up a VM and copy-paste the commandline, then use that as the base of
+    your `--kernel-command-line` argument. For me it was like this:
+
+    ```
+     --kernel-command-line="initrd=\debian\initrd initrd=\debian\6.12.0-00057-ga91a0599bdb7\kernel-modules.initrd systemd.mount-extra=LABEL=scratch:/var/tmp:ext4 rw systemd.wants=network.target module_blacklist=vmw_vmci systemd.tty.term.hvc0=tmux-256color systemd.tty.columns.hvc0=139 systemd.tty.rows.hvc0=71 ip=enc0:any ip=enp0s1:any ip=enp0s2:any ip=host0:any ip=none loglevel=4 SYSTEMD_SULOGIN_FORCE=1 systemd.tty.term.console=tmux-256color systemd.tty.columns.console=139 systemd.tty.rows.console=71 console=hvc0 TERM=tmux-256color"
+    ```
+
+  This might benefit from some engagement with the mkosi folkd.
+
 
 ## Historical notes for my future self
 
