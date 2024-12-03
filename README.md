@@ -11,6 +11,11 @@ make it work without internet access (as long as you can SSH to the box).
 
 ## Usage:
 
+- Once: build the phoronix-test-suite container image:
+  ```
+  podman build -t pts pts-container/
+  podman save --format oci-archive -o pts-container/pts.oci pts
+  ```
 - Set these environment variables:
 
   ```

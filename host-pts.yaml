@@ -4,5 +4,42 @@
   hosts: host_hosts
   vars:
     out_artifacts_dir: host_artifacts
-  roles:
-  - run_pts
+  tasks:
+  # Running PTS on the bare metal host by default produced abysmal IO scores. I
+  # suspect the reason is just that it's doing disk IO against the USB mass
+  # storage. Running it in a container was a lazy attempt to try and avoid that
+  # without having to actually understand how the benchmark works. The scores
+  # increased dramatically so I guess it works OK.
+  # Ansible has logic to build container images but it didn't work the first
+  # time I tried so immediately gave up, instead the image is built manually
+  # with:
+  #   podman build -t pts pts-container/
+  #   podman save --format oci-archive -o pts-container/pts.oci pts
+  - name: Copy container image file to host
+    copy:
+      src: pts-container/pts.oci
+      dest: pts.oci
+  - name: Install general dependency packages
+    become: yes
+    ansible.builtin.apt:
+      pkg:
+      - podman
+  - name: Load container image in host
+    command: "podman load -i pts.oci"
+  - name: Run PTS in a container
+    # Default networking setup requires kernel features that I seem to have
+    # disabled. Not exactly sure what they are so just switch networking off.
+    command:
+      cmd: "podman run --network none pts"
+  - name: Extract JSON results from container
+    command:
+      argv:
+      - "bash"
+      - "-c"
+      - |
+        container=$(podman ps -a | tail -1 | awk '{print $1 }')
+        podman cp $container:/root/pts-results.json .
+  - name: Fetch JSON result
+    fetch:
+      src: pts-results.json
+      dest: host_artifacts

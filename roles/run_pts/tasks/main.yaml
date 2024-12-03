@@ -20,12 +20,6 @@
     path: "{{ pts_var_dir }}"
     state: directory
 
-# This is instead of running `phoronix-test-suite batch-setup`
-- name: Configure PTS for batch mode
-  copy:
-    src: ./pts-config/user-config.xml
-    dest: "{{ pts_config_file }}"
-
 # This is instead of running `phoronix-test-suite add-suite`
 - name: Configure PTS suites
   copy:
@@ -44,6 +38,14 @@
   command:
     cmd: ./phoronix-test-suite batch-install fio
     chdir: phoronix-test-suite
+
+# This is instead of running `phoronix-test-suite batch-setup`
+# It needs to be done after installing the fio stuff since it switches off
+# internet for dumb reasons (see container version of this config).
+- name: Configure PTS for batch mode
+  copy:
+    src: ./pts-config/user-config.xml
+    dest: "{{ pts_config_file }}"
 
 - name: Run the fio suite
   shell:
