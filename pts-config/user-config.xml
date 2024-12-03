@@ -64,8 +64,8 @@
       <Configured>TRUE</Configured>
     </BatchMode>
     <Networking>
-      <NoInternetCommunication>FALSE</NoInternetCommunication>
-      <NoNetworkCommunication>FALSE</NoNetworkCommunication>
+      <NoInternetCommunication>TRUE</NoInternetCommunication>
+      <NoNetworkCommunication>TRUE</NoNetworkCommunication>
       <Timeout>20</Timeout>
       <ProxyAddress></ProxyAddress>
       <ProxyPort></ProxyPort>
