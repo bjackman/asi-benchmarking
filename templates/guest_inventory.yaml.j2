@@ -5,4 +5,6 @@ guests:
       ansible_user: god
       ansible_host: {{ result.stdout }}
       ansible_ssh_common_args: '-i ssh_private_key -o ProxyCommand="ssh -o IdentitiesOnly=yes -W %h:%p -p {{ ansible_ssh_port }} {{ ansible_user }}@{{ ansible_host }}"'
+      # Sometimes it fails the first time, I dunno.
+      ansible_ssh_retries: 2
 {% endfor %}
