@@ -51,6 +51,8 @@ curl_pikvm POST "/api/msd/set_connected?connected=0"
 ssh_pikvm kvmd-helper-otgmsd-remount rw
 # Dont use -a since we care about the permissions on the remote. But set --times
 # so rsync can detect when no new copying is needed.
+# TODO: https://matrix.to/#/!eDYSPHneOFqkLxOIBv:matrix.org/$_T7epJlO-TONCWpw7i0qJxfqUOBLUdg2-SAREovtDag?via=matrix.org&via=fedora.im&via=mozilla.org
+# With the above and guestfish's remote support I think we might be able to just copy the ESP?
 rsync -vz --sparse --progress --times -e "ssh -p $PIKVM_SSH_PORT" \
     mkosi/image.raw "$PIKVM_SSH_USER@$PIKVM_HOST:/var/lib/kvmd/msd/image.raw"
 # Not documented but PiKVM falls over without at least these perms:
