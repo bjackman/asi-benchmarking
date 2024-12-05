@@ -253,8 +253,11 @@
       - |
         if [ -e /proc/config.gz ]; then
           gunzip < /proc/config.gz > /tmp/kconfig
+        elif [ -e /boot/config-$(uname -r) ]; then
+          cp /boot/config-$(uname -r) /tmp/kconfig
         else
-          /boot/config-$(uname -r) /tmp/kconfig
+          echo "Did you forget IKCONFIG_PROC=y?"
+          exit 1
         fi
 
   - name: Downlod kernel config
