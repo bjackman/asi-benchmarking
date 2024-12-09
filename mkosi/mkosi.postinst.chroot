@@ -6,3 +6,6 @@ if [ ! -e /root/.ssh/id_rsa ]; then
     exit 1
 fi
 chmod 600 /root/.ssh/id_rsa
+# For some reason netplan is also fussy about perms.
+chmod 600 /etc/netplan/*
+
