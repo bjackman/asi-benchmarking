@@ -2,3 +2,4 @@
 /image.*
 /.mkosi.cache/
 mkosi.extra/usr/lib/modules/
+root/.ssh/id_*

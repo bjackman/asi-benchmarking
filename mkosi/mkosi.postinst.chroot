@@ -1,3 +1,8 @@
 #!/bin/bash
 
+# Don't want a new SSH key every time we boot the image so require the user to prepopulate one.
+if [ ! -e /root/.ssh/id_rsa ]; then
+    echo "Please run ssh-keygen -f mkosi/mkosi.extra/root/.ssh/id_rsa from the root of the repo"
+    exit 1
+fi
 chmod 600 /root/.ssh/id_rsa

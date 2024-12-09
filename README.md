@@ -16,6 +16,10 @@ make it work without internet access (as long as you can SSH to the box).
   podman build -t pts pts-container/
   podman save --format oci-archive -o pts-container/pts.oci pts
   ```
+- Once: Generate a keypair for the host:
+- ```
+  ssh-keygen -f mkosi/mkosi.extra/root/.ssh/id_rsa
+  ```
 - Set these environment variables:
 
   ```
