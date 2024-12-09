@@ -3,4 +3,3 @@
 /.mkosi.cache/
 mkosi.extra/usr/lib/modules/
 mkosi.extra/root/.ssh/id_*
-mkosi.local.conf

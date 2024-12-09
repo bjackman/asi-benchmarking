@@ -46,13 +46,9 @@ make it work without internet access (as long as you can SSH to the box).
     - `CONFIG_LOCALVERSION_AUTO` so you know exactly what kernel code you're testing
     - `CONFIG_IKCONFIG`  and `CONFIG_IKCONFIG_PROC` so you know the kernel config.
 
-- Build your kernel as a `bzImage`
-- Tell mkosi where to find your kernel by writing this into
-  `mkosi/mkosi.local.conf` (note the `:kernel` at the end):
-  ```init
-  [Build]
-  BuildSources=/path/to/kernel/tree:kernel
-  ```
+- Build your kernel as a `bzImage`, copy it to
+  `./mkosi/mkosi.extra/usr/lib/modules/$(make kernelrelease)/vmlinuz` in this
+  repo.
 - Write an inventory describing the host. The group with the host instances should be called
   `host_hosts` and each host should have a variable called
   `kernel_deb_local_path` containing the kernel image and one called
