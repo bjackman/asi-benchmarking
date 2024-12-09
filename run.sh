@@ -11,6 +11,15 @@ DB_ROOT="$1"
 # Remaining args will be passed through to mkosi
 shift 1
 
+# Fail fast if env is bad
+echo "$PIKVM_PASSWORD" >/dev/null
+echo "$PIKVM_HOST" >/dev/null
+echo "$PIKVM_HTTPS_PORT" >/dev/null
+echo "$PIKVM_SSH_USER" >/dev/null
+echo "$PIKVM_SSH_PORT" >/dev/null
+echo "$HOST" >/dev/null
+echo "$HOST_SSH_PORT" >/dev/null
+
 # First arg is verb, second arg is query.
 curl_pikvm() {
     curl -X "$1"  -k -H X-KVMD-User:${PIKVM_USER:-admin} -H X-KVMD-Passwd:$PIKVM_PASSWORD \
