@@ -61,7 +61,11 @@ ssh_pikvm kvmd-helper-otgmsd-remount rw
 # Dont use -a since we care about the permissions on the remote. But set --times
 # so rsync can detect when no new copying is needed.
 # TODO: https://matrix.to/#/!eDYSPHneOFqkLxOIBv:matrix.org/$_T7epJlO-TONCWpw7i0qJxfqUOBLUdg2-SAREovtDag?via=matrix.org&via=fedora.im&via=mozilla.org
-# With the above and guestfish's remote support I think we might be able to just copy the ESP?
+# With this:
+# guestfish -a "ssh://$PIKVM_SSH_USER@$PIKVM_HOST:$PIKVM_SSH_PORT/var/lib/kvmd/msd/image.raw" -a mkosi/image.esp.raw
+# Plus the copy-device-to-device guestfish command, it
+# shoudl be possible to avoid copying the whole disk image and just write the
+# ESP directly into it on the remote host. In practice this seems to be unbelievably slow.
 rsync -vz --sparse --progress --times -e "ssh -p $PIKVM_SSH_PORT" \
     mkosi/image.raw "$PIKVM_SSH_USER@$PIKVM_HOST:/var/lib/kvmd/msd/image.raw"
 # Not documented but PiKVM falls over without at least these perms:
