@@ -3,7 +3,7 @@ Description=SSH Tunnel to GCE
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/ssh -o StrictHostKeyChecking=no -R 0.0.0.0:2222:localhost:22 brendan@64:ff9b::34.90.180.154 -N
+ExecStart=/usr/bin/ssh -o ExitOnForwardFailure=yes  -o StrictHostKeyChecking=no -R 0.0.0.0:2222:localhost:22 brendan@64:ff9b::34.90.180.154 -N
 Restart=always
 RestartSec=10
 
