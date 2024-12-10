@@ -93,8 +93,9 @@ done
 
 # Run the benchmark
 ansible-playbook -i host-inventory.yaml host-setup.yaml
+# ... In the guest
+# (Do this first, because for some reason after the bare metal run, SSH connections fail for a while...)
+ansible-playbook -i guest-inventories/aethelred/tmp/guest-inventory.yaml guest-pts.yaml
 # ... On bare metal
 ansible-playbook -i host-inventory.yaml host-pts.yaml
-# ... In the guest
-ansible-playbook -i guest-inventories/aethelred/tmp/guest-inventory.yaml guest-pts.yaml
 ./upload_results.sh "$DB_ROOT"
