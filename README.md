@@ -88,6 +88,26 @@ make it work without internet access (as long as you can SSH to the box).
 
   This might benefit from some engagement with the mkosi folkd.
 
+## Skipping all the slow stuff
+
+If the target machine is currently working and you can access it, you can
+short-circuit most of the above. After copying the kernel image into the
+`mkosi.extra` dir as described above:
+
+- Run `mkosi -C -f --split-artifacts=partitions` from the root of this repo.
+- Copy the ESP onto the target, e.g.
+
+  ```sh
+  rsync -vz --sparse --progress -e "ssh -p $HOST_SSH_PORT" mkosi/image.esp.raw root@$HOST:
+  ```
+- On the target, just smush the ESP into the appopriate block device:
+
+  ```sh
+  # (Check first if this is the correct block device)
+  ssh root@$TARGET -p $TARGET_SSH_PORT "cat image.esp.raw > /dev/sda1 && reboot"
+  ```
+- Finish your whiskey and disappear into the night, leaving only cigarillo smoke
+  and whispered memories behind.
 
 ## Historical notes for my future self
 
